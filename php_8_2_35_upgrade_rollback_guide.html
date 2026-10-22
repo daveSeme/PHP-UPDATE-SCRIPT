@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Windows Server PHP 8.2.27 → 8.2.35 Upgrade & Rollback Guide</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #5e6b80;
+      --paper: #f4f7fb;
+      --panel: #ffffff;
+      --line: #dce4ef;
+      --navy: #10213a;
+      --blue: #2563eb;
+      --blue-soft: #eaf1ff;
+      --green: #147d55;
+      --green-soft: #e8f7ef;
+      --amber: #98600a;
+      --amber-soft: #fff5dc;
+      --red: #b42318;
+      --red-soft: #fff0ee;
+      --code: #101827;
+      --code-ink: #e6edf7;
+      --shadow: 0 14px 40px rgba(20, 38, 70, .08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    a { color: var(--blue); }
+    .hero {
+      background: radial-gradient(circle at 85% 15%, #294d83 0, transparent 32%),
+                  linear-gradient(135deg, #0d1728, #17365e);
+      color: #fff;
+      padding: 58px 24px 46px;
+    }
+    .hero-inner, main, footer { width: min(1080px, calc(100% - 36px)); margin: 0 auto; }
+    .eyebrow {
+      display: inline-block; border: 1px solid rgba(255,255,255,.25);
+      background: rgba(255,255,255,.08); border-radius: 999px;
+      padding: 5px 11px; font-size: .78rem; letter-spacing: .09em; text-transform: uppercase;
+    }
+    h1 { max-width: 850px; font-size: clamp(2rem, 5vw, 3.45rem); line-height: 1.1; margin: 18px 0 14px; letter-spacing: -.035em; }
+    .hero p { color: #d7e4f6; max-width: 760px; font-size: 1.08rem; margin: 0; }
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .hero-meta span { border-radius: 8px; padding: 6px 10px; background: rgba(255,255,255,.1); font-size: .85rem; }
+    main { padding: 28px 0 56px; }
+    .notice {
+      padding: 17px 19px; border-radius: 12px; margin: 0 0 20px;
+      border: 1px solid var(--line); background: var(--panel);
+    }
+    .notice strong { display: block; margin-bottom: 4px; }
+    .notice.warning { background: var(--amber-soft); border-color: #f2d89c; color: #694509; }
+    .notice.danger { background: var(--red-soft); border-color: #ffc9c2; color: #7d2119; }
+    .notice.success { background: var(--green-soft); border-color: #b9e7ce; color: #10583d; }
+    .layout { display: grid; grid-template-columns: 245px minmax(0, 1fr); gap: 22px; align-items: start; }
+    aside, section.card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+    aside { padding: 18px; position: sticky; top: 16px; }
+    aside h2 { font-size: .9rem; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+    aside a { display: block; padding: 7px 9px; text-decoration: none; border-radius: 8px; font-size: .91rem; color: var(--ink); }
+    aside a:hover { background: var(--blue-soft); color: var(--blue); }
+    .content { min-width: 0; display: grid; gap: 18px; }
+    section.card { padding: clamp(18px, 3vw, 28px); min-width: 0; }
+    h2 { margin: 0 0 13px; font-size: 1.55rem; line-height: 1.25; letter-spacing: -.02em; }
+    h3 { margin: 24px 0 8px; font-size: 1.08rem; }
+    p { margin: 8px 0 13px; }
+    ul, ol { padding-left: 23px; }
+    li { margin: 6px 0; }
+    .muted { color: var(--muted); }
+    .tag { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: .76rem; font-weight: 700; background: var(--blue-soft); color: #1d4ed8; vertical-align: middle; }
+    .step { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 12px; margin: 18px 0; }
+    .step-number { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: var(--navy); color: #fff; font-weight: 800; }
+    .step-body { min-width: 0; }
+    .step-body h3 { margin: 3px 0 7px; }
+    .code-wrap { margin: 12px 0 16px; border-radius: 12px; overflow: hidden; background: var(--code); border: 1px solid #253248; }
+    .code-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; background: #1a2638; color: #bac8dc; font-size: .78rem; }
+    .code-head button {
+      border: 1px solid #46556b; background: #27364d; color: #fff; border-radius: 7px;
+      padding: 5px 9px; font: inherit; cursor: pointer;
+    }
+    .code-head button:hover { background: #354968; }
+    pre { margin: 0; padding: 16px; overflow: auto; color: var(--code-ink); font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 2; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .inline-code { background: #eef2f7; border: 1px solid #dce4ef; padding: 2px 5px; border-radius: 5px; font-size: .9em; }
+    .comment { color: #8293aa; }
+    .cmd { color: #9cdcfe; }
+    .string { color: #ce9178; }
+    .keyword { color: #c586c0; }
+    .good { color: #86efac; }
+    .bad { color: #fca5a5; }
+    .table-wrap { overflow-x: auto; margin: 12px 0; }
+    table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: .93rem; }
+    th, td { border: 1px solid var(--line); padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #f0f4fa; }
+    .checklist label { display: flex; align-items: flex-start; gap: 9px; margin: 10px 0; }
+    .checklist input { margin-top: 6px; accent-color: var(--blue); }
+    .callout { border-left: 4px solid var(--blue); padding: 11px 14px; background: #f2f6ff; border-radius: 0 9px 9px 0; margin: 13px 0; }
+    .button-link { display: inline-block; text-decoration: none; border-radius: 9px; padding: 10px 14px; background: var(--blue); color: #fff; font-weight: 700; margin: 6px 8px 6px 0; }
+    .button-link.secondary { background: #eaf0f8; color: #1c2c43; }
+    footer { padding: 0 0 36px; color: var(--muted); font-size: .88rem; }
+    .small { font-size: .88rem; }
+    @media (max-width: 820px) {
+      .layout { grid-template-columns: 1fr; }
+      aside { position: static; }
+      aside nav { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 2px; }
+    }
+    @media (max-width: 480px) {
+      .hero { padding: 38px 18px 32px; }
+      .hero-inner, main, footer { width: min(100% - 24px, 1080px); }
+      aside nav { grid-template-columns: 1fr; }
+      pre { font-size: 12px; padding: 12px; }
+      section.card { padding: 17px; }
+    }
+    @media print {
+      body { background: #fff; }
+      .hero { background: #10213a !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      aside { position: static; box-shadow: none; }
+      .layout { grid-template-columns: 1fr; }
+      .content section { break-inside: avoid; box-shadow: none; }
+      .code-wrap { break-inside: avoid; }
+      .code-head button { display: none; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Operations Runbook · Windows Server / IIS</span>
+      <h1>PHP 8.2.27 → PHP 8.2.35</h1>
+      <p>A practical upgrade, validation, and rollback guide for a Yii application running on IIS with PHP Non-Thread-Safe (NTS) x64.</p>
+      <div class="hero-meta">
+        <span>Windows Server</span><span>IIS FastCGI</span><span>PHP NTS x64</span><span>Yii application</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="notice warning">
+      <strong>Before you start</strong>
+      Run PowerShell as Administrator, schedule a maintenance window, and ensure you have a tested application/database backup. This guide uses example paths and names: replace them with the actual paths, IIS site, handler, and app-pool names on your server. Do not paste commands blindly into production.
+    </div>
+    <div class="notice danger">
+      <strong>Version and download check</strong>
+      Confirm that PHP 8.2.35 is the exact approved build for your environment and that the archive is available from the official PHP for Windows distribution. PHP 8.2.35 is not necessarily the newest 8.2 security patch. Prefer the latest supported security patch approved by your organization. Download only from an official, trusted source and verify the package before deployment.
+    </div>
+
+    <div class="layout">
+      <aside>
+        <h2>On this page</h2>
+        <nav>
+          <a href="#overview">Overview</a>
+          <a href="#inspect">1. Inspect server</a>
+          <a href="#backup">2. Back up</a>
+          <a href="#download">3. Download & extract</a>
+          <a href="#configure">4. Configure PHP</a>
+          <a href="#iis">5. Configure IIS</a>
+          <a href="#verify">6. Verify app</a>
+          <a href="#rollback-options">Rollback options</a>
+          <a href="#rollback-script">PowerShell rollback</a>
+          <a href="#troubleshooting">Troubleshooting</a>
+          <a href="#checklist">Final checklist</a>
+        </nav>
+      </aside>
+
+      <div class="content">
+        <section class="card" id="overview">
+          <h2>Overview</h2>
+          <p>The safer approach is to install PHP 8.2.35 into a <strong>new folder</strong>, keep PHP 8.2.27 untouched, test the new binary, then change only the relevant IIS FastCGI handler. This makes rollback much easier than overwriting the existing PHP directory.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Setting</th><th>Example value</th><th>Action</th></tr></thead>
+              <tbody>
+                <tr><td>Old PHP folder</td><td><code>C:\PHP\8.2.27</code></td><td>Keep intact for rollback</td></tr>
+                <tr><td>New PHP folder</td><td><code>C:\PHP\8.2.35</code></td><td>Install new version here</td></tr>
+                <tr><td>PHP mode</td><td>NTS x64</td><td>Must match IIS FastCGI deployment</td></tr>
+                <tr><td>PHP executable for IIS</td><td><code>C:\PHP\8.2.35\php-cgi.exe</code></td><td>Set handler to this executable</td></tr>
+                <tr><td>Configuration</td><td><code>php.ini</code></td><td>Copy and review; do not assume every extension is compatible</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="muted small">If your current PHP is installed directly in <code>C:\PHP</code>, use that actual path for the old installation and adjust the new path to fit your server conventions.</p>
+        </section>
+
+        <section class="card" id="inspect">
+          <h2>1. Inspect the current server</h2>
+          <p>Open <strong>PowerShell as Administrator</strong>. Record the current PHP version, configuration file, extension directory, IIS sites, handlers, and application pools before making changes.</p>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · inspect current PHP</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code># PHP command resolution and version
+php -v
+where.exe php
+php --ini
+php -i | Select-String "Architecture|Thread Safety|Compiler|Loaded Configuration File|extension_dir"
+
+# IIS appcmd
+$appcmd = "$env:windir\System32\inetsrv\appcmd.exe"
+& $appcmd version
+& $appcmd list sites
+& $appcmd list apppools
+& $appcmd list config /section:system.webServer/fastCgi
+& $appcmd list config /section:system.webServer/handlers</code></pre>
+          </div>
+          <div class="callout">Save the output somewhere safe. The <code>php</code> command in PowerShell may resolve to a different PHP binary than IIS uses. IIS's FastCGI <code>scriptProcessor</code> path is the key setting for the web application.</div>
+          <h3>Record these values</h3>
+          <ul>
+            <li>Exact old <code>php-cgi.exe</code> path.</li>
+            <li>Exact IIS site name and PHP handler mapping name.</li>
+            <li>Application pool name for the Yii site.</li>
+            <li>Old <code>php.ini</code> and the list of enabled extensions.</li>
+            <li>Database connectivity details and current Yii logs/errors.</li>
+          </ul>
+        </section>
+
+        <section class="card" id="backup">
+          <h2>2. Back up before changing IIS</h2>
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-body">
+              <h3>Create an IIS configuration backup</h3>
+              <div class="code-wrap">
+                <div class="code-head"><span>PowerShell · Administrator</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+                <pre><code>$appcmd = "$env:windir\System32\inetsrv\appcmd.exe"
+& $appcmd add backup "BeforePHP8235"</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-body">
+              <h3>Back up the existing PHP folder</h3>
+              <p>Change the source path to your actual current PHP folder. Example:</p>
+              <div class="code-wrap">
+                <div class="code-head"><span>PowerShell</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+                <pre><code>robocopy "C:\PHP\8.2.27" "C:\PHP_backup_8.2.27" /E /COPY:DAT /DCOPY:DAT /R:1 /W:1
+if ($LASTEXITCODE -ge 8) { throw "PHP backup failed. Stop here and investigate." }</code></pre>
+              </div>
+              <p class="small muted">Robocopy exit codes 0–7 are generally non-fatal; 8 or above indicates a copy failure. Check the output and verify the backup exists.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-body">
+              <h3>Back up the Yii application and database</h3>
+              <p>Use your organization's normal backup process. This PHP change should not require a schema migration, but a recoverable backup is still essential.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" id="download">
+          <h2>3. Download and extract PHP NTS x64</h2>
+          <p>Verify the exact release filename and URL on the official PHP for Windows site before running the download. The URL below is an example target; if it returns 404 or the release is not listed, do not use a third-party mirror or substitute an unverified archive.</p>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · download and extract</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code>$ErrorActionPreference = "Stop"
+
+$work = "C:\PHPUpgrade"
+$newPhp = "C:\PHP\8.2.35"
+$zip = Join-Path $work "php-8.2.35-nts-Win32-vs16-x64.zip"
+$url = "https://downloads.php.net/~windows/releases/php-8.2.35-nts-Win32-vs16-x64.zip"
+
+New-Item -ItemType Directory -Path $work -Force | Out-Null
+New-Item -ItemType Directory -Path $newPhp -Force | Out-Null
+
+# Confirm this exact official URL and release filename before running.
+Invoke-WebRequest -Uri $url -OutFile $zip
+
+# Inspect the downloaded file before extraction.
+Get-Item $zip | Select-Object FullName, Length, LastWriteTime
+Get-FileHash $zip -Algorithm SHA256
+
+Expand-Archive -LiteralPath $zip -DestinationPath $newPhp -Force
+
+# Confirm expected binaries exist.
+Test-Path (Join-Path $newPhp "php.exe")
+Test-Path (Join-Path $newPhp "php-cgi.exe")
+Test-Path (Join-Path $newPhp "ext")</code></pre>
+          </div>
+          <div class="notice warning">
+            If any expected file check returns <code>False</code>, stop and inspect the extracted directory. Do not point IIS at a folder until you have confirmed it contains the expected PHP binaries. Compare the SHA-256 hash against an official published hash if one is available.
+          </div>
+        </section>
+
+        <section class="card" id="configure">
+          <h2>4. Configure and test the new PHP installation</h2>
+          <h3>Prepare php.ini</h3>
+          <p>Use the old configuration as a reference. Preserve application-required settings, but review every extension and path. Never copy an old <code>php.ini</code> blindly without checking paths and compatibility.</p>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · create initial configuration</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code>$newPhp = "C:\PHP\8.2.35"
+Copy-Item "$newPhp\php.ini-development" "$newPhp\php.ini"
+
+# Open the new configuration in Notepad.
+notepad "$newPhp\php.ini"</code></pre>
+          </div>
+          <p>In the new <code>php.ini</code>, set at minimum the correct extension directory and review the settings below. Values are examples; preserve your existing production values where appropriate.</p>
+          <div class="code-wrap">
+            <div class="code-head"><span>php.ini · illustrative settings</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code>extension_dir = "C:\PHP\8.2.35\ext"
+date.timezone = "Africa/Nairobi"
+log_errors = On
+display_errors = Off</code></pre>
+          </div>
+          <ul>
+            <li>Compare the old and new INI files and migrate required settings, such as memory limit, upload limits, timezone, error log, session settings, and any Yii-required extensions.</li>
+            <li>Enable only extensions required by the application, for example <code>curl</code>, <code>mbstring</code>, <code>openssl</code>, <code>pdo_mysql</code> or the database driver your app actually uses, <code>fileinfo</code>, <code>gd</code>, <code>intl</code>, and <code>zip</code>.</li>
+            <li>Ensure extension DLLs are from the same PHP release/build, architecture, and NTS package. Check any external DLL dependencies.</li>
+            <li>Keep <code>display_errors=Off</code> in production; log errors instead.</li>
+          </ul>
+          <h3>Test the PHP CLI and modules</h3>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code>$newPhp = "C:\PHP\8.2.35"
+& "$newPhp\php.exe" -v
+& "$newPhp\php.exe" --ini
+& "$newPhp\php.exe" -m
+& "$newPhp\php.exe" -i | Select-String "Architecture|Thread Safety|Compiler|Loaded Configuration File|extension_dir"</code></pre>
+          </div>
+          <p>Confirm that the loaded configuration file is the new <code>php.ini</code>, thread safety reports disabled, the architecture is x64, and all required extensions load without startup warnings.</p>
+        </section>
+
+        <section class="card" id="iis">
+          <h2>5. Configure IIS FastCGI</h2>
+          <p>First inspect the current FastCGI applications and handler mappings. You may need to add a new FastCGI application and update the PHP handler for the specific site. Do not change a shared/global mapping unless you intend every dependent site to move to the new PHP version.</p>
+          <h3>Register the new FastCGI executable if needed</h3>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · IIS appcmd</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code>$appcmd = "$env:windir\System32\inetsrv\appcmd.exe"
+$newCgi = "C:\PHP\8.2.35\php-cgi.exe"
+
+# Inspect existing entries first.
+& $appcmd list config /section:system.webServer/fastCgi
+
+# Only if the exact new path is not already registered:
+& $appcmd set config /section:system.webServer/fastCgi "/+[fullPath='$newCgi']" /commit:apphost</code></pre>
+          </div>
+          <h3>Update the PHP handler mapping for the target site</h3>
+          <p>Replace <code>Default Web Site</code> and <code>PHP_via_FastCGI</code> with the exact names found in your IIS configuration. Confirm the handler is the intended PHP handler before changing it.</p>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · example only</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code>$appcmd = "$env:windir\System32\inetsrv\appcmd.exe"
+$siteName = "Default Web Site"
+$handlerName = "PHP_via_FastCGI"
+$newCgi = "C:\PHP\8.2.35\php-cgi.exe"
+
+# Review the target site's handler list before modifying it.
+& $appcmd list config "$siteName" /section:system.webServer/handlers
+
+# Update only after verifying the site and handler names.
+& $appcmd set config "$siteName" /section:system.webServer/handlers "/[name='$handlerName'].scriptProcessor:$newCgi" /commit:apphost
+
+# Review the resulting handler mapping.
+& $appcmd list config "$siteName" /section:system.webServer/handlers</code></pre>
+          </div>
+          <div class="notice warning">
+            IIS configuration syntax can differ based on whether a handler is inherited, defined at site level, or configured in a <code>web.config</code>. If <code>appcmd</code> reports that the mapping cannot be found, stop and inspect the existing configuration rather than repeatedly trying variations. Keep a copy of the original handler configuration.
+          </div>
+          <h3>Recycle the correct application pool</h3>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code>$appcmd = "$env:windir\System32\inetsrv\appcmd.exe"
+$appPool = "REPLACE_WITH_YOUR_APP_POOL"
+
+& $appcmd recycle apppool /apppool.name:"$appPool"</code></pre>
+          </div>
+        </section>
+
+        <section class="card" id="verify">
+          <h2>6. Verify the website and Yii application</h2>
+          <ol>
+            <li>Use a temporary, access-restricted diagnostic PHP file in the actual site root.</li>
+            <li>Visit it locally or through the approved internal test URL and confirm the web runtime reports PHP 8.2.35.</li>
+            <li>Check the loaded INI file, extension list, and error log.</li>
+            <li>Test login, database access, key Yii pages, uploads, sessions, scheduled jobs, and any APIs that depend on PHP extensions.</li>
+            <li>Delete the diagnostic file immediately after verification. Do not leave <code>phpinfo()</code> exposed on a public website.</li>
+          </ol>
+          <div class="code-wrap">
+            <div class="code-head"><span>Temporary diagnostic file · version-check.php</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code>&lt;?php
+header('Content-Type: text/plain; charset=utf-8');
+
+echo 'PHP_VERSION=' . PHP_VERSION . PHP_EOL;
+echo 'PHP_SAPI=' . PHP_SAPI . PHP_EOL;
+echo 'PHP_INT_SIZE=' . PHP_INT_SIZE . PHP_EOL;
+echo 'LOADED_INI=' . (php_ini_loaded_file() ?: '(none)') . PHP_EOL;
+echo 'EXTENSION_DIR=' . ini_get('extension_dir') . PHP_EOL;
+
+echo 'PDO=' . (extension_loaded('PDO') ? 'yes' : 'no') . PHP_EOL;
+echo 'cURL=' . (extension_loaded('curl') ? 'yes' : 'no') . PHP_EOL;
+echo 'mbstring=' . (extension_loaded('mbstring') ? 'yes' : 'no') . PHP_EOL;
+</code></pre>
+          </div>
+          <p class="small muted">The file reports runtime details only; it does not prove the full application is healthy. Remove it as soon as checks are complete.</p>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · remove diagnostic file</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code># Replace with the actual site-root path.
+Remove-Item "C:\inetpub\wwwroot\version-check.php" -Force</code></pre>
+          </div>
+        </section>
+
+        <section class="card" id="rollback-options">
+          <h2>Rollback options</h2>
+          <p>Choose the least disruptive rollback that matches what changed. The preferred quick rollback is to point the same site's PHP handler back to the old <code>php-cgi.exe</code>, then recycle its app pool.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Option</th><th>Use when</th><th>What it restores</th><th>Risk / note</th></tr></thead>
+              <tbody>
+                <tr><td><strong>A. Handler-only rollback</strong></td><td>The new PHP runtime fails after switching IIS.</td><td>Handler points back to PHP 8.2.27.</td><td>Usually the fastest option; restore old INI separately if changed.</td></tr>
+                <tr><td><strong>B. Restore old php.ini</strong></td><td>The old runtime now reads a modified configuration.</td><td>Previous PHP settings and extension configuration.</td><td>Restore to the exact path IIS/old PHP uses.</td></tr>
+                <tr><td><strong>C. IIS configuration backup</strong></td><td>Several IIS settings changed and a broader restore is necessary.</td><td>IIS configuration from a named backup.</td><td>Can revert unrelated IIS changes made after the backup. Use only after assessing impact.</td></tr>
+                <tr><td><strong>D. Full server recovery</strong></td><td>The server or application remains unhealthy beyond PHP/IIS config.</td><td>Server/app/database state according to your backup plan.</td><td>Follow your organization's disaster-recovery process.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="notice success">
+            <strong>Keep both PHP folders during the observation period.</strong>
+            Do not delete PHP 8.2.27, its configuration, or the IIS backup until the upgraded Yii application has passed acceptance checks and the rollback window has closed.
+          </div>
+
+          <h3>Option A — manually switch the handler back</h3>
+          <p>Use the actual previous PHP CGI path and the same IIS site/handler names you recorded before the upgrade.</p>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · manual handler rollback</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code>$appcmd = "$env:windir\System32\inetsrv\appcmd.exe"
+
+$siteName = "Default Web Site"                  # Change this
+$handlerName = "PHP_via_FastCGI"                # Change this
+$oldCgi = "C:\PHP\8.2.27\php-cgi.exe"           # Change to the real old path
+$appPool = "REPLACE_WITH_YOUR_APP_POOL"         # Change this
+
+if (-not (Test-Path $oldCgi)) {
+    throw "Old PHP CGI executable not found: $oldCgi"
+}
+
+# Review the target mapping first.
+& $appcmd list config "$siteName" /section:system.webServer/handlers
+
+# If the old CGI path is not registered in FastCGI, register it.
+# Inspect the existing FastCGI list before running this command.
+& $appcmd list config /section:system.webServer/fastCgi
+
+# Run the next line only if the exact old executable is not registered:
+# & $appcmd set config /section:system.webServer/fastCgi "/+[fullPath='$oldCgi']" /commit:apphost
+
+# Point the verified site handler back to the old executable.
+& $appcmd set config "$siteName" /section:system.webServer/handlers "/[name='$handlerName'].scriptProcessor:$oldCgi" /commit:apphost
+
+# Recycle only the affected app pool.
+& $appcmd recycle apppool /apppool.name:"$appPool"
+
+# Inspect the resulting mapping.
+& $appcmd list config "$siteName" /section:system.webServer/handlers</code></pre>
+          </div>
+          <p>Then restore the original PHP 8.2.27 <code>php.ini</code> if it was modified, browse the Yii application, check logs, and confirm the web runtime reports 8.2.27.</p>
+
+          <h3>Option B — restore the saved php.ini</h3>
+          <p>Use the backup you created before upgrading. Confirm the source and destination paths before copying.</p>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · example only</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code># Example paths only: replace with your actual backup and old PHP paths.
+$iniBackup = "C:\PHP_backup_8.2.27\php.ini"
+$oldIni = "C:\PHP\8.2.27\php.ini"
+
+if (-not (Test-Path $iniBackup)) { throw "INI backup not found: $iniBackup" }
+
+Copy-Item -LiteralPath $iniBackup -Destination $oldIni -Force</code></pre>
+          </div>
+          <p class="small muted">If your old PHP configuration was stored elsewhere, use that exact original location. Avoid overwriting the old configuration with the new PHP 8.2.35 INI.</p>
+
+          <h3>Option C — restore a full IIS backup (high impact)</h3>
+          <p>Only use this when a broader IIS rollback is intended. First review the available backups. Restoring the whole IIS configuration can undo unrelated site, binding, certificate, or application changes made since the backup.</p>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · review backups</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code>$appcmd = "$env:windir\System32\inetsrv\appcmd.exe"
+& $appcmd list backup</code></pre>
+          </div>
+          <p>After reviewing impact and obtaining approval, the IIS restore command for a named backup is:</p>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · use only after approval</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code># HIGH IMPACT: restores IIS configuration from the named backup.
+# It may revert unrelated IIS changes made since that backup.
+& $appcmd restore backup "BeforePHP8235"</code></pre>
+          </div>
+        </section>
+
+        <section class="card" id="rollback-script">
+          <h2>PowerShell rollback script</h2>
+          <p>This script is intentionally interactive. Save it as <code>Rollback-PHP-8235.ps1</code>, review/edit the default paths and names, then run it in an elevated PowerShell window. It changes the selected site's handler and recycles the selected pool; it does not delete PHP folders or restore the entire IIS backup.</p>
+          <div class="notice warning">
+            <strong>Do not run with example values unchanged.</strong>
+            Replace the site, handler, app-pool, and old CGI path with values recorded from your own server. Confirm that the selected handler belongs to the intended site.
+          </div>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · Rollback-PHP-8235.ps1</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code># Rollback-PHP-8235.ps1
+# Run PowerShell as Administrator.
+# This script switches one IIS site's PHP handler back to the old PHP CGI binary.
+# It does NOT delete either PHP installation or restore all IIS configuration.
+
+$ErrorActionPreference = "Stop"
+
+# EDIT THESE VALUES before running.
+$SiteName = "Default Web Site"
+$HandlerName = "PHP_via_FastCGI"
+$OldPHP = "C:\PHP\8.2.27\php-cgi.exe"
+$AppPoolName = "REPLACE_WITH_YOUR_APP_POOL"
+
+$appcmd = "$env:windir\System32\inetsrv\appcmd.exe"
+
+# Require elevation.
+$currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = [Security.Principal.WindowsPrincipal]::new($currentIdentity)
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw "Open PowerShell as Administrator and run the script again."
+}
+
+if (-not (Test-Path -LiteralPath $appcmd)) {
+    throw "IIS appcmd.exe not found: $appcmd"
+}
+if (-not (Test-Path -LiteralPath $OldPHP)) {
+    throw "Old PHP CGI executable not found: $OldPHP"
+}
+if ($AppPoolName -eq "REPLACE_WITH_YOUR_APP_POOL") {
+    throw "Edit `$AppPoolName in this script to the real application pool name."
+}
+
+Write-Host "`nRollback target:" -ForegroundColor Cyan
+Write-Host "Site:       $SiteName"
+Write-Host "Handler:    $HandlerName"
+Write-Host "Old PHP:    $OldPHP"
+Write-Host "App pool:   $AppPoolName"
+
+Write-Host "`nCurrent handler configuration:" -ForegroundColor Yellow
+& $appcmd list config "$SiteName" /section:system.webServer/handlers
+if ($LASTEXITCODE -ne 0) { throw "Could not read handler configuration. No change made." }
+
+Write-Host "`nFastCGI registrations:" -ForegroundColor Yellow
+& $appcmd list config /section:system.webServer/fastCgi
+if ($LASTEXITCODE -ne 0) { throw "Could not read FastCGI configuration. No change made." }
+
+Write-Host "`nType ROLLBACK to proceed with this handler change."
+$confirmation = Read-Host "Confirmation"
+if ($confirmation -cne "ROLLBACK") {
+    Write-Host "Cancelled. No changes made." -ForegroundColor Yellow
+    exit 0
+}
+
+# Preserve the current IIS state immediately before the rollback.
+$backupName = "BeforeRollbackPHP8235_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+& $appcmd add backup $backupName
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not create IIS safety backup. No handler change made."
+}
+Write-Host "Created IIS backup: $backupName" -ForegroundColor Green
+
+# Register old PHP with FastCGI if not already registered.
+$fastCgiOutput = (& $appcmd list config /section:system.webServer/fastCgi 2>&1 | Out-String)
+if ($fastCgiOutput -notmatch [regex]::Escape($OldPHP)) {
+    Write-Host "Old PHP is not visibly registered in FastCGI." -ForegroundColor Yellow
+    $register = Read-Host "Register the old PHP CGI executable? Type YES"
+    if ($register -ceq "YES") {
+        & $appcmd set config /section:system.webServer/fastCgi "/+[fullPath='$OldPHP']" /commit:apphost
+        if ($LASTEXITCODE -ne 0) { throw "FastCGI registration failed. Inspect IIS config." }
+    } else {
+        throw "Stopped before changing the handler because old PHP is not registered."
+    }
+}
+
+# Update only the selected handler on the selected site.
+& $appcmd set config "$SiteName" /section:system.webServer/handlers "/[name='$HandlerName'].scriptProcessor:$OldPHP" /commit:apphost
+if ($LASTEXITCODE -ne 0) {
+    throw "Handler update failed. Inspect IIS configuration and the safety backup."
+}
+
+# Recycle only the selected application pool.
+& $appcmd recycle apppool /apppool.name:"$AppPoolName"
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "App pool recycle returned a non-zero code. Check IIS state manually."
+}
+
+Write-Host "`nResulting handler configuration:" -ForegroundColor Cyan
+& $appcmd list config "$SiteName" /section:system.webServer/handlers
+
+Write-Host "`nNext: restore the old php.ini if needed, browse the Yii application, inspect logs, and confirm the web runtime reports the old PHP version." -ForegroundColor Green</code></pre>
+          </div>
+          <h3>How to run the script</h3>
+          <div class="code-wrap">
+            <div class="code-head"><span>PowerShell · run instructions</span><button type="button" onclick="copyCode(this)">Copy</button></div>
+            <pre><code># Save the script to this path, then edit its values first.
+notepad "C:\PHPUpgrade\Rollback-PHP-8235.ps1"
+
+# Run in an elevated PowerShell session.
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+& "C:\PHPUpgrade\Rollback-PHP-8235.ps1"</code></pre>
+          </div>
+          <p class="small muted">The execution-policy change applies only to the current PowerShell process. Follow your server's script-signing and change-control rules if they are stricter.</p>
+        </section>
+
+        <section class="card" id="troubleshooting">
+          <h2>Troubleshooting guide</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Symptom</th><th>Likely area to inspect</th><th>First action</th></tr></thead>
+              <tbody>
+                <tr><td>HTTP 500 / blank page</td><td>PHP startup, Yii exception, app logs</td><td>Check PHP error log and Yii runtime logs; keep display_errors off publicly.</td></tr>
+                <tr><td>HTTP 502.3 / FastCGI error</td><td>Wrong CGI path, permissions, process startup</td><td>Confirm the handler path exists and IIS identity can execute/read required files.</td></tr>
+                <tr><td>“Unable to load dynamic library”</td><td>Wrong extension directory or DLL dependency</td><td>Check extension_dir, exact extension DLL, architecture, NTS build, and dependencies.</td></tr>
+                <tr><td>CLI works but web app fails</td><td>CLI and IIS use different PHP/INI files</td><td>Check the IIS handler's scriptProcessor and use the temporary web diagnostic file.</td></tr>
+                <tr><td>Database connection fails</td><td>Missing driver or changed config</td><td>Verify the app's actual PDO/database extension and configuration.</td></tr>
+                <tr><td>Rollback command says handler not found</td><td>Handler scope/name or inherited mapping</td><td>Inspect site and application-level handler configuration; don't guess the mapping name.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card" id="checklist">
+          <h2>Final checklist</h2>
+          <p class="muted">Tick these items during the change window. Your selections are local to this page and are not saved to a server.</p>
+          <div class="checklist">
+            <label><input type="checkbox"> Maintenance window and change approval confirmed.</label>
+            <label><input type="checkbox"> Old PHP folder, php.ini, Yii app, database, and IIS configuration backed up.</label>
+            <label><input type="checkbox"> Official PHP NTS x64 archive verified and extracted into a separate folder.</label>
+            <label><input type="checkbox"> New php.ini reviewed; required extensions load without warnings.</label>
+            <label><input type="checkbox"> Exact IIS site, handler, FastCGI registration, and app pool identified.</label>
+            <label><input type="checkbox"> Yii login, database, uploads, sessions, and critical pages tested.</label>
+            <label><input type="checkbox"> Temporary diagnostic PHP file removed.</label>
+            <label><input type="checkbox"> Rollback path tested or documented; old PHP folder retained.</label>
+          </div>
+          <div class="notice success">
+            <strong>Completion criteria</strong>
+            The website reports the intended PHP version, Yii critical workflows work, PHP and Yii logs are clean enough for acceptance, and the team knows exactly how to return to the previous version if required.
+          </div>
+          <p class="small muted">Prepared as an operational template. Adapt it to your IIS layout, PHP configuration, Yii version, extensions, deployment process, and organizational change-control requirements before production use.</p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>PHP / IIS upgrade runbook · Keep a copy with the change ticket and record the actual paths and names used during deployment.</p>
+  </footer>
+
+  <script>
+    function copyCode(button) {
+      const code = button.closest('.code-wrap').querySelector('pre code');
+      const text = code ? code.innerText : '';
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          const old = button.textContent;
+          button.textContent = 'Copied!';
+          setTimeout(() => button.textContent = old, 1400);
+        }).catch(() => fallbackCopy(text, button));
+      } else {
+        fallbackCopy(text, button);
+      }
+    }
+    function fallbackCopy(text, button) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        const old = button.textContent;
+        button.textContent = 'Copied!';
+        setTimeout(() => button.textContent = old, 1400);
+      } catch (error) {
+        button.textContent = 'Copy failed';
+      }
+      textarea.remove();
+    }
+  </script>
+</body>
+</html>
